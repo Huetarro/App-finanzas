@@ -71,32 +71,8 @@
             <canvas id="expensesChart" height="200"></canvas>
         </section>
 
-        <!-- Transacciones Recientes -->
-        <section class="flex flex-col gap-4 mb-20">
-            <h3 class="font-bold">Recientes</h3>
-            
-            <div class="flex items-center justify-between bg-cardBg p-4 rounded-3xl border border-neutral-800">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-neutral-900 rounded-full flex items-center justify-center text-xl">🍣</div>
-                    <div>
-                        <p class="font-bold">Goiko Grill</p>
-                        <p class="text-xs text-neutral-500 font-medium">Comida</p>
-                    </div>
-                </div>
-                <p class="font-bold text-red-400">-€34.50</p>
-            </div>
-
-            <div class="flex items-center justify-between bg-cardBg p-4 rounded-3xl border border-neutral-800">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-neutral-900 rounded-full flex items-center justify-center text-xl">🛒</div>
-                    <div>
-                        <p class="font-bold">Mercadona</p>
-                        <p class="text-xs text-neutral-500 font-medium">Compra</p>
-                    </div>
-                </div>
-                <p class="font-bold text-red-400">-€85.20</p>
-            </div>
-        </section>
+        <!-- Contenedor vacío donde Firebase cargará los datos -->
+        <section id="lista-transacciones" class="flex flex-col gap-4 mb-20"></section>
 
     </div>
 
@@ -126,6 +102,59 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         console.log("🔥 Firebase conectado con éxito");
+// 1. Diccionario de Categorías (Aquí configuras los iconos)
+        const categoriasUI = {
+            "Compra": { emoji: "🛒", color: "text-red-400" },
+            "Comida": { emoji: "🍣", color: "text-red-400" },
+            "Ocio": { emoji: "🍿", color: "text-red-400" },
+            "Salud": { emoji: "💊", color: "text-red-400" },
+            "Alquiler": { emoji: "🏠", color: "text-red-400" },
+            "Ingreso": { emoji: "💰", color: "text-green-400" },
+            "default": { emoji: "💸", color: "text-neutral-400" } // Si viene una categoría nueva
+        };
+
+        // 2. Función para leer de Firebase y pintar en pantalla
+        async function cargarGastos() {
+            const contenedor = document.getElementById('lista-transacciones');
+            contenedor.innerHTML = '<h3 class="font-bold">Cargando gastos...</h3>'; // Mensaje temporal
+
+            try {
+                // Va a Firebase a pedir los documentos de la colección "transacciones"
+                const respuesta = await getDocs(collection(db, "transacciones"));
+                
+                // Limpiamos y ponemos el título definitivo
+                contenedor.innerHTML = '<h3 class="font-bold">Recientes</h3>'; 
+
+                // Por cada gasto que encuentre, crea la cajita HTML
+                respuesta.forEach((documento) => {
+                    const datos = documento.data();
+                    
+                    // Busca la categoría. Si no la encuentra, usa la de por defecto ("default")
+                    const estilo = categoriasUI[datos.categoria] || categoriasUI["default"];
+
+                    const gastoHTML = `
+                    <div class="flex items-center justify-between bg-cardBg p-4 rounded-3xl border border-neutral-800 mb-2">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-neutral-900 rounded-full flex items-center justify-center text-xl">${estilo.emoji}</div>
+                            <div>
+                                <p class="font-bold text-white">${datos.titulo}</p>
+                                <p class="text-xs text-neutral-500 font-medium">${datos.categoria}</p>
+                            </div>
+                        </div>
+                        <p class="font-bold ${estilo.color}">${datos.cantidad}€</p>
+                    </div>
+                    `;
+                    // Añade la cajita a la web
+                    contenedor.innerHTML += gastoHTML;
+                });
+            } catch (error) {
+                console.error("Error al cargar de Firebase:", error);
+                contenedor.innerHTML = '<p class="text-red-500">Error cargando los datos.</p>';
+            }
+        }
+
+        // Ejecutar la función nada más abrir la web
+        cargarGastos();
     </script>
 
     <!-- Lógica de la UI (Pestañas y Gráficos) -->
@@ -152,10 +181,28 @@
             if(tabId === 'conjunta') balanceEl.innerText = '€2,220.50';
         }
 
-        // Simulación conexión Salt Edge
-        function connectBank() {
-            alert("Redirigiendo a la pasarela segura de Salt Edge...");
-            // Aquí irá la lógica de redirección a la API de Salt Edge
+       // Conexión real con el Backend en Vercel
+        async function connectBank() {
+            const btn = event.target;
+            btn.innerText = "Cargando...";
+            
+            try {
+                // Llamamos a nuestra función secreta de Vercel
+                const response = await fetch('/api/connect');
+                const result = await response.json();
+                
+                // Redirigimos al usuario a la web segura de Salt Edge para que elija su banco
+                if (result.data && result.data.connect_url) {
+                    window.location.href = result.data.connect_url;
+                } else {
+                    alert("Error al conectar con el banco");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Hubo un problema con la conexión");
+            } finally {
+                btn.innerText = "+ Sincronizar Banco";
+            }
         }
 
         // Gráfico con Chart.js
